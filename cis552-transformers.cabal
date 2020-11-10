@@ -1,0 +1,21 @@
+cabal-version:       >=1.10
+name:                cis552-transformers
+version:             0.1.0.0
+-- synopsis:
+-- description:
+license-file:        LICENSE
+maintainer:          sweirich@cis.upenn.edu
+build-type:          Simple
+extra-source-files:  CHANGELOG.md
+
+library
+  exposed-modules:     Transformers
+                     , State
+  build-depends:       HUnit >= 1.6.0.0
+                     , QuickCheck >= 2.13.2
+                     , base >=4.13 && <4.14
+                     , containers >= 0.6.2.1
+                     , mtl
+                     , pretty >= 1.1.3.6
+  default-language:    Haskell2010
+  ghc-options:        -Wno-missing-signatures -Wtype-defaults -Wincomplete-patterns
