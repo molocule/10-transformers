@@ -12,7 +12,9 @@ instance Monad (State s) where
   return x = S (x,) -- this tuple section (x,) is equivalent to \y -> (x,y)
 
   (>>=) :: State s a -> (a -> State s b) -> State s b
-  st >>= f = undefined
+  st >>= f = S { runState = \s ->
+    let (a, s') = runState st s
+     in runState (f a) s' }
 
 instance Functor (State s) where
   fmap = liftM
@@ -22,10 +24,10 @@ instance Applicative (State s) where
   (<*>) = ap
 
 evalState :: State s a -> s -> a
-evalState = undefined
+evalState st s = fst (runState st s)
 
 execState :: State s a -> s -> s
-execState = undefined
+execState st s = snd (runState st s)
 
 get :: State s s
 get = S $ \s -> (s, s)
@@ -34,4 +36,7 @@ put :: s -> State s ()
 put s' = S $ const ((), s')
 
 modify :: (s -> s) -> State s ()
-modify = undefined
+modify f = do
+  s <- get
+  put (f s)
+  
