@@ -12,6 +12,8 @@ import Control.Monad (ap, liftM)
 import State (State) -- State monad developed in lecture
 import qualified State as S
 
+-- Using multiple Monads at Once
+
 data Expr
   = Val Int
   | Div Expr Expr
@@ -70,6 +72,8 @@ goProf e = putStrLn $ "value: " ++ show x ++ ", count: " ++ show s
   where
     (x, s) = S.runState (evalProf e) 0 :: (Int, Int)
 
+-- Step 1: Describing monads with special features
+
 class Monad m => MonadError e m where
   throwError :: e -> m a
 
@@ -90,6 +94,8 @@ instance MonadState s (State s) where
   get = S.get
   put = S.put
 
+-- Step 2: using monads with special features
+
 evalMega (Val n) = return n
 evalMega (Div x y) = do
   n <- evalMega x
@@ -100,7 +106,13 @@ evalMega (Div x y) = do
       tickStateInt
       return (n `div` m)
 
+-- interlude: Mega
+
 newtype Mega a = Mega {runMega :: Int -> Either String (a, Int)}
+
+-- note: compare to Parser type
+-- newtype Parser a = P {doParse :: String -> Maybe (a, String)}
+
 
 instance Monad Mega where
   return :: a -> Mega a
@@ -134,6 +146,8 @@ goMega e = putStr $ pr (evalMega e)
           ++ "Result: "
           ++ show v
           ++ "\n"
+
+-- Step 3: adding features to existing monads
 
 newtype ExceptT e m a = MkExc {runExceptT :: m (Either e a)}
 
@@ -192,6 +206,8 @@ instance Monad m => MonadState s (StateT s m) where
       putIt :: s -> m ((), s)
       putIt _ = undefined
 
+-- Step 4: preserving old features of monads
+
 class MonadTrans (t :: (* -> *) -> * -> *) where -- from Control.Monad.Trans (among other places)
   lift :: Monad m => m a -> t m a
 
@@ -223,6 +239,8 @@ instance MonadState s m => MonadState s (ExceptT e m) where
   put :: s -> ExceptT e m ()
   put = lift . put
 
+-- step 5: putting it all together
+
 evalExSt :: Expr -> StateT Int (Either String) Int
 evalExSt = evalMega
 
@@ -248,6 +266,8 @@ goStEx e = putStr $ pr (evalStEx e)
     pr f = "Count: " ++ show cnt ++ "\n" ++ show r ++ "\n"
       where
         (r, cnt) = S.runState (runExceptT f) 0
+
+-- step 6: getting originals back
 
 newtype Id a = MkId a deriving (Show)
 
