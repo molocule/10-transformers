@@ -13,7 +13,7 @@ module MtlExample where
 import Control.Monad.Identity 
     ( Identity(runIdentity) )
 import Control.Monad.State
-    ( StateT(runStateT), MonadState(put, get), runState )
+    ( StateT(runStateT), MonadState(put, get) )
 import Control.Monad.Except
     ( ExceptT, MonadError(throwError), runExceptT )
 
@@ -55,10 +55,21 @@ eval (Div x y) = do
 
 ---------------------------------------------------------
 
+-- newtype StateT s m a = MkStateT {runStateT :: s -> m (a, s)}
+-- newtype ExceptT e m a = MkExc {runExceptT :: m (Either e a)}
+
+-- StateT Int (ExceptT String Identity) Int 
+-- Int -> (ExceptT String Identity) (Int, Int)
+-- Int -> Identity (Either String (Int, Int))
+-- Int -> Either String (Int, Int)
+
+-- State s a = StateT s Identity a
+-- Except e a = ExceptT e Identity a
+
 goExSt :: Expr -> IO ()
 goExSt e = putStr $ pr (eval e)
   where
-    pr :: StateT Int (ExceptT String Identity) Int -> String
+    -- pr :: StateT Int (ExceptT String Identity) Int -> String
     pr f = case runIdentity (runExceptT (runStateT f 0)) of
       Left s -> "Raise: " ++ s ++ "\n"
       Right (v, cnt) ->
@@ -67,10 +78,16 @@ goExSt e = putStr $ pr (eval e)
           ++ show v
           ++ "\n"
 
+-- ExceptT String (StateT Int Identity) Int
+-- (StateT Int Identity) (Either String Int)
+-- Int -> Identity (Either String Int, Int)
+-- Int -> (Either String Int, Int)
+
 goStEx :: Expr -> IO ()
 goStEx e = putStr $ pr (eval e)
   where
-    pr :: ExceptT String (StateT Int Identity) Int -> String
+    -- pr :: ExceptT String (StateT Int Identity) Int -> String
     pr f = "Count: " ++ show cnt ++ "\n" ++ show r ++ "\n"
       where
         (r, cnt) = runIdentity (runStateT (runExceptT f) 0)
+

@@ -12,6 +12,8 @@ library
   exposed-modules:     Transformers
                      , State
                      , MtlExample
+                     , WhileExn
+                     , TransExercise
   build-depends:       HUnit >= 1.6.0.0
                      , QuickCheck >= 2.13.2
                      , base >=4.13 && <4.14

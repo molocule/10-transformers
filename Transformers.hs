@@ -43,11 +43,17 @@ evalDefault (Div x y) =
 
 evalMaybe :: Expr -> Maybe Int
 evalMaybe (Val n) = return n
-evalMaybe (Div x y) = undefined
+evalMaybe (Div x y) = do
+    vx <- evalMaybe x
+    vy <- evalMaybe y
+    if vy == 0 then Nothing else return (vx `div` vy)
 
 evalEither :: Expr -> Either String Int
 evalEither (Val n) = return n
-evalEither (Div x y) = undefined
+evalEither (Div x y) = do
+    vx <- evalEither x
+    vy <- evalEither y
+    if vy == 0 then throwError (errorS x y) else return (vx `div` vy)
 
 errorS :: Show a => a -> a -> String
 errorS y m = "Error dividing " ++ show y ++ " by " ++ show m
@@ -79,7 +85,7 @@ class Monad m => MonadError e m where
 
 instance MonadError s (Either s) where
   throwError :: s -> Either s a
-  throwError = undefined
+  throwError = Left
 
 class Monad m => MonadState s m where
   get :: m s
@@ -116,9 +122,11 @@ newtype Mega a = Mega {runMega :: Int -> Either String (a, Int)}
 
 instance Monad Mega where
   return :: a -> Mega a
-  return x = undefined
+  return x = Mega $ \s -> Right (x,s)
   (>>=) :: Mega a -> (a -> Mega b) -> Mega b
-  ma >>= fmb = undefined
+  ma >>= fmb = Mega $ \s -> case runMega ma s of
+                                Left str -> Left str
+                                Right (a, s') -> runMega (fmb a) s'
 
 instance Applicative Mega where
   pure = return
@@ -129,11 +137,11 @@ instance Functor Mega where
 
 instance MonadError String Mega where
   throwError :: String -> Mega a
-  throwError str = undefined
+  throwError str = Mega $ \_ -> Left str
 
 instance MonadState Int Mega where
-  get = undefined
-  put x = undefined
+  get = Mega $ \s -> Right (s,s)
+  put x = Mega $ \_ -> Right ((), x)
 
 goMega :: Expr -> IO ()
 goMega e = putStr $ pr (evalMega e)
@@ -198,13 +206,13 @@ instance Monad m => MonadState s (StateT s m) where
   get = MkStateT getIt
     where
       getIt :: s -> m (s, s)
-      getIt s = undefined
+      getIt s = return (s,s)
 
   put :: s -> StateT s m ()
   put s = MkStateT putIt
     where
       putIt :: s -> m ((), s)
-      putIt _ = undefined
+      putIt _s2 = return ((), s)
 
 -- Step 4: preserving old features of monads
 
@@ -228,9 +236,11 @@ instance MonadTrans (StateT s) where
     r <- ma
     return (r, s)
 
+
 instance MonadError e m => MonadError e (StateT s m) where
   throwError :: e -> StateT s m a
-  throwError = lift . throwError
+  throwError x = lift (throwError x)
+
 
 instance MonadState s m => MonadState s (ExceptT e m) where
   get :: ExceptT e m s
@@ -238,6 +248,7 @@ instance MonadState s m => MonadState s (ExceptT e m) where
 
   put :: s -> ExceptT e m ()
   put = lift . put
+
 
 -- step 5: putting it all together
 
@@ -262,7 +273,7 @@ goExSt e = putStr $ pr (evalExSt e)
 goStEx :: Expr -> IO ()
 goStEx e = putStr $ pr (evalStEx e)
   where
-    pr :: ExceptT String Prof Int -> String
+    --pr :: ExceptT String Prof Int -> String
     pr f = "Count: " ++ show cnt ++ "\n" ++ show r ++ "\n"
       where
         (r, cnt) = S.runState (runExceptT f) 0
@@ -272,8 +283,8 @@ goStEx e = putStr $ pr (evalStEx e)
 newtype Id a = MkId a deriving (Show)
 
 instance Monad Id where
-  return x = undefined
-  (MkId p) >>= f = undefined
+  return= MkId
+  (MkId p) >>= f = f p
 
 instance Applicative Id where
   pure = return
