@@ -34,13 +34,19 @@ evalOp _ _ _ = IntVal 0
 type M = ExceptT Value (State Store)
 
 executeE :: Expression -> Store -> (Either Value Value, Store)
-executeE e st = runState (runExceptT comp) st
+executeE e = runState (runExceptT comp)
   where
     comp :: M Value
     comp = evalE e
 
 runE :: Expression -> IO ()
 runE e = putStrLn $ display (fst (executeE e Map.empty))
+
+-- >>> display (fst (executeE (Op  (Val (IntVal 1)) Divide (Val (IntVal 0))) Map.empty))
+-- "Result: IntVal 0"
+
+-- >>> display (fst (executeE (Op  (Val (IntVal 1)) Divide (Val (IntVal 1))) Map.empty))
+-- "Result: IntVal 1"
 
 raisesE :: Expression -> Value -> Test
 s `raisesE` v = case executeE s Map.empty of
@@ -66,6 +72,9 @@ test_expErrors :: Test
 test_expErrors =
   "undefined variable & division by zero"
     ~: TestList [test_undefined, test_divByZero, test_badPlus]
+
+-- >>> runTestTT test_expErrors
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 3}
 
 evalS :: (MonadError Value m, MonadState Store m) => Statement -> m ()
 evalS w@(While e (Block ss)) = do
@@ -99,6 +108,12 @@ run block = do
   putStr "Output Store: "
   print s
 
+-- >>> run $ Block [While (Val (IntVal 0)) (Block [])]
+-- Prelude.undefined
+-- CallStack (from HasCallStack):
+--   error, called at libraries/base/GHC/Err.hs:80:14 in base:GHC.Err
+--   undefined, called at /Users/sweirich/552/lecture-repos/10-transformers/TransExercise.hs:99:16 in fake_uid:TransExercise
+
 raises :: Block -> Value -> Test
 s `raises` v = case execute s Map.empty of
   (Left v', _) -> v ~?= v'
@@ -110,16 +125,33 @@ test_badWhile = Block [While (Val (IntVal 0)) (Block [])] `raises` IntVal 3
 test_badIf :: Test
 test_badIf = Block [If (Val (IntVal 0)) (Block []) (Block [])] `raises` IntVal 4
 
+-- >>> runTestTT test_badWhile
+-- Prelude.undefined
+-- CallStack (from HasCallStack):
+--   error, called at libraries/base/GHC/Err.hs:80:14 in base:GHC.Err
+--   undefined, called at /Users/sweirich/552/lecture-repos/10-transformers/TransExercise.hs:99:16 in fake_uid:TransExercise
+
+-- >>> runTestTT test_badIf
+-- Prelude.undefined
+-- CallStack (from HasCallStack):
+--   error, called at libraries/base/GHC/Err.hs:80:14 in base:GHC.Err
+--   undefined, called at /Users/sweirich/552/lecture-repos/10-transformers/TransExercise.hs:99:16 in fake_uid:TransExercise
+
 tryExpr :: Block
 tryExpr = Block [Assign "x" (Val (IntVal 0)), Assign "y" (Val (IntVal 1)), Try (Block [If (Op (Var "x") Lt (Var "y")) (Block [Assign "a" (Val (IntVal 100)), Throw (Op (Var "x") Plus (Var "y")), Assign "b" (Val (IntVal 200))]) (Block [])]) "e" (Block [Assign "z" (Op (Var "e") Plus (Var "a"))])]
 
-test1 :: IO ()
-test1 = run tryExpr
+-- >>> run tryExpr
+-- Prelude.undefined
+-- CallStack (from HasCallStack):
+--   error, called at libraries/base/GHC/Err.hs:80:14 in base:GHC.Err
+--   undefined, called at /Users/sweirich/552/lecture-repos/10-transformers/TransExercise.hs:99:16 in fake_uid:TransExercise
 
+-- display the result of evaluation
 display :: Show a => Either Value a -> String
 display (Left v) = "Uncaught exception: " ++ displayExn v
 display (Right v) = "Result: " ++ show v
 
+-- decode an exception value
 displayExn :: Value -> String
 displayExn (IntVal 0) = "Undefined variable"
 displayExn (IntVal 1) = "Divide by zero"
