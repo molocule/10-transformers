@@ -10,16 +10,30 @@ extra-source-files:  CHANGELOG.md
 
 library
   exposed-modules:     Transformers
-                     , State
-                     , MtlExample
-                     , WhileExn
+                     , LSyntax
                      , TransExercise
-  build-depends:       HUnit >= 1.6.0.0
-                     , QuickCheck >= 2.13.2
-                     , base >=4.13 && <4.14
-                     , containers >= 0.6.2.1
-                     , mtl
-                     , pretty >= 1.1.3.6
-                     
+                     , State
+  build-depends:       HUnit >= 1.6
+                     , QuickCheck >= 2.14
+                     , base >= 4.14
+                     , containers >= 0.6
+                     , mtl >= 2.2
+                     , pretty >= 1.1
   default-language:    Haskell2010
   ghc-options:        -Wno-missing-signatures -Wtype-defaults -Wincomplete-patterns
+  default-extensions:  ScopedTypeVariables
+                     , TypeApplications
+                     , InstanceSigs
+                     , KindSignatures
+                     , LambdaCase
+                     , DeriveFunctor
+                     , DeriveFoldable
+                     , DeriveTraversable
+                     , GeneralizedNewtypeDeriving
+                     , TupleSections
+                     , MultiParamTypeClasses
+                     , FlexibleInstances
+                     , FlexibleContexts
+                     , UndecidableInstances
+                     , NoMonomorphismRestriction
+                     , NoStarIsType
