@@ -1,6 +1,7 @@
 {-
 ---
 fulltitle: Monad Transformers
+date: November 16, 2021
 ---
 -}
 {-# LANGUAGE FlexibleContexts #-}
@@ -9,13 +10,12 @@ fulltitle: Monad Transformers
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Transformers where
 
 import Control.Monad (ap, liftM)
--- State monad developed in lecture
-
 import Data.Kind (Type)
 import State (State)
 import qualified State as S
@@ -62,14 +62,16 @@ err =
 {-
 The first evaluates properly and returns a valid answer, while the
 second fails with a divide-by-zero exception.
+-}
 
-~~~~~{.haskell}
-    *Main> eval ok
-    *Main> eval err
-~~~~~
+-- >>> eval ok
 
-We don't like this `eval` because it can blow up with a divide-by-zero
-error and stop the whole evaluator.
+-- >>> eval err
+
+{-
+This `eval` function is not very good because it can blow up with a
+divide-by-zero error and stop the whole evaluator. And, there is nothing to
+ do about it: we can't catch the error.
 
 Of course, one way to fix the problem is to detect the error and then
 continue with a default value (such as 0).
@@ -94,20 +96,22 @@ evalMaybe (Val n) = return n
 evalMaybe (Div x y) = undefined
 
 {-
-~~~~~{.haskell}
-    *Main> evalMaybe ok
-    Just 42
-    *Main> evalMaybe err
-    Nothing
-~~~~~
+This version should return `Just 42` for the `ok` term and `Nothing` for `err`.
+-}
 
+-- >>> evalMaybe ok
+
+-- >>> evalMaybe err
+
+{-
 Error Handling Via Exception Monads
 -----------------------------------
 
-The trouble with the above is that it doesn't let us know *where* the divide
-by zero occurred. It would be nice to have a real exception mechanism where
-we could say `throw X` (where `X` is a description of what went wrong), which
-would percolate up to the top and tell us what the problem was.
+Using the `Maybe` monad is concise and let's us detect and react to the
+error. However, it is still not ideal---it doesn't let us know *where* the
+divide by zero occurred. It would be nice to have a real exception mechanism
+where we could say `throw X` (where `X` is a description of what went wrong),
+which would percolate up to the top and tell us what the problem was.
 
 Instead of using `Maybe` we can use the `Either` datatype for our
 result.
@@ -118,14 +122,14 @@ result.
 
 ~~~~~~~~
 
-In this example, we can use `Right` like `Just` to indicate a successful result.
+In this example, we can use `Right` like `Just` to indicate success.
 However, although `Left` is like `Nothing`, it carries a value of type `s`
 denoting what the problem was. In the examples below, we will use type `String`
 for `s`. This string will be our error message.
 
 The type `Either s` is a monad, with a very similar definition to that of
-`Maybe`.  Note that we are partially applying this type constructor when
-we create this instance!
+`Maybe`.  Note that the instance is for `Either s` not `Either s a` -- the two
+type parameters to `Either` are not treated symmetrically.
 
 ~~~~~~~~~{.haskell}
 
@@ -155,19 +159,18 @@ where the helper function `errorS` generates the error string.
 errorS :: Show a => a -> a -> String
 errorS y m = "Error dividing " ++ show y ++ " by " ++ show m
 
-{-
-~~~~~{.haskell}
-    *Main> evalEither ok
-    Right 42
-    *Main> evalEither err
-    Left "Error dividing Val 1 by Div (Val 2) (Val 3)"
-~~~~~
+-- >>> evalEither ok
+-- Right 42
 
+-- >>> evalEither err
+-- Left "Error dividing Val 1 by Div (Val 2) (Val 3)"
+
+{-
 Counting Operations Using the State Monad
 -----------------------------------------
 
-Next, let's stop being so paranoid about errors and instead try to do
-some *profiling*. Lets imagine that the `div` operator is very
+Next, let's stop being paranoid about errors and instead try to do
+some *profiling*. Let's imagine that the `div` operator is very
 expensive, and that we would like to *count* the number of divisions
 that are performed while evaluating a particular expression.
 
@@ -204,36 +207,33 @@ evalProf (Div x y) = do
 and observe it at work
 -}
 
-goProf :: Expr -> IO ()
-goProf e = putStrLn $ "value: " ++ show x ++ ", count: " ++ show s
+goProf :: Expr -> String
+goProf e = "value: " ++ show x ++ ", count: " ++ show s
   where
     (x, s) = S.runState (evalProf e) 0 :: (Int, Int)
 
-{-
-~~~~~{.haskell}
-    *Main> goProf ok
-    value: 42, count: 2
-~~~~~
+-- >>> goProf ok
+-- value: 42, count: 2
 
+{-
 But... alas!  To get the profiling, we threw out the nifty error
 handling that we had put in earlier!!
+-}
 
-~~~~~{.haskell}
-    *Main> goProf err
-    value: *** Exception: divide by zero
-~~~~~
+-- goProf err
+-- value: *** Exception: divide by zero
 
+{-
 Transformers: Making Monads Multitask
 =====================================
 
-So, at the moment, it seems that Monads can do many things, but only
-*one thing at a time* -- you can either use a monad to do the error-
-management plumbing *or* to do the state-manipulation plumbing, but
-not both at the same time.  Is it too much ask for both? I guess we could
-write a *mega-state-and-exception* monad that supports the operations
-of both, but that doesn't sound like any fun at all!  Especially
-since, if we later decide to add yet another feature, then we would
-have to make up yet another mega-monad.
+So, at the moment, it seems that Monads can do many things, but only *one
+thing at a time* -- you can either use a monad to do the error- management
+plumbing *or* to do the state-manipulation plumbing, but not both at the same
+time.  Is it too much ask for both? I guess we could write a
+*mega-state-and-exception* monad that supports the operations of both, but
+that doesn't sound fun!  Especially since, if we later decide to add yet
+another feature, then we would have to make up yet another mega-monad.
 
 So we will take a different approach, where we will keep *wrapping* --
 or "decorating" -- monads with extra features, so that we can take a
@@ -259,21 +259,19 @@ Decorators][3].)
 Step 1: *Describing* Monads With Special Features
 -----------------------------------------------
 
-The first step to being able to compose monads is to define
-typeclasses that describe monads with particular features. For
-example, the notion of an *exception monad* is captured by the
-typeclass
+The first step to being able to compose monads is to define typeclasses that
+describe monads *with* particular features. For example, the notion of an
+*exception monad* is captured by the typeclass that describes monads that are
+also equipped with an appropriate `throwError` function.
 -}
 
 class Monad m => MonadError e m where
   throwError :: e -> m a
 
 {-
-that describes monads that are also equipped with an appropriate
-`throwError` function. This function takes an error value of
-type `e`  (e.g. `String` for error messages). The result type is `m a` where
-`a` is polymorphic --- in otherwords, we can throw an error in any
-(monadic) context.
+This function takes an error value of type `e` (e.g. `String` for error
+messages). The result type is `m a` where `a` is polymorphic --- in
+otherwords, we can throw an error in any (monadic) context.
 
 We can make `Either s` an instance of the above class
 like this:
@@ -281,15 +279,16 @@ like this:
 
 instance MonadError s (Either s) where
   throwError :: s -> Either s a
-  throwError = undefined
+  throwError = Left
 
 {-
 Now see what happens if you change `Left` to `throwError` in the
 evaluator `evalEither` above and remove the type signature.
-What is the new type of the evaluator that ghci infers?
+What is the new type of the evaluator that GHC infers?
 
-Similarly, we can bottle the notion of a *state monad* in a
-typeclass...
+Similarly, we can bottle the key operations of a *state monad* in a typeclass
+that describes monads equipped with extraction (get) and modification (put)
+functions of appropriate types.
 -}
 
 class Monad m => MonadState s m where
@@ -297,9 +296,7 @@ class Monad m => MonadState s m where
   put :: s -> m ()
 
 {-
-which describes monads equipped with extraction (get) and modification (put)
-functions of appropriate types.  We can then redefine the ticking operation
-to work for any state monad:
+We can then redefine the ticking operation to work for any state monad:
 -}
 
 tickStateInt :: MonadState Int m => m ()
@@ -326,6 +323,7 @@ Armed with these two typeclasses, we can write our exception-throwing,
 step-counting evaluator quite easily:
 -}
 
+evalMega :: (MonadError String m, MonadState Int m) => Expr -> m Int
 evalMega (Val n) = return n
 evalMega (Div x y) = do
   n <- evalMega x
@@ -340,13 +338,9 @@ evalMega (Div x y) = do
 Note that it is simply the combination of the two evaluators from before -- we
 use the error handling from `evalEither` and the profiling from `evalProf`.
 
-Meditate for a moment on the type of above evaluator; note that it
+Meditate for a moment on the type of the above evaluator; note that it
 works with *any monad* that is *both* a exception- and a state- monad!
-
-~~~~~{.haskell}
-         *Main> :t evalMega
-         evalMega :: (MonadError String m, MonadState Int m) => Expr -> m Int
-~~~~~
+(Also observe that if you remove this type annotation, GHC can infer it for you.)
 
 Interlude: Creating MegaMonads
 -----------------------------
@@ -354,11 +348,12 @@ Interlude: Creating MegaMonads
 But where do we *get* monads that are both state-manipulating and
 exception-handling?
 
-One answer is that we can just define one!
+One answer is that we could just define one! Below is the start of the Mega
+monad that I alluded to above: it's a bit fiddly to complete these definitions,
+but you can generally use the types as your guide.
 
-***Exercise***: define one! Finish the instances for `Monad`, `MonadError
-String`, and `MonadState Int`. Make sure that `evalMega` works with your
-monad.
+Next, finish the instances for `Monad`, `MonadError String`, and `MonadState
+Int`. Make sure that `evalMega` works with your monad.
 -}
 
 newtype Mega a = Mega {runMega :: Int -> Either String (a, Int)}
@@ -388,44 +383,45 @@ instance MonadState Int Mega where
 Finally, once we have a Mega monad, we can run it.
 -}
 
-goMega :: Expr -> IO ()
-goMega e = putStr $ pr (evalMega e)
+goMega :: Expr -> String
+goMega e = pr (evalMega e)
   where
     pr :: Mega Int -> String
     pr f = case runMega f 0 of
-      Left s -> "Raise: " ++ s ++ "\n"
+      Left s -> "Raise: " ++ s
       Right (v, cnt) ->
-        "Count: " ++ show cnt ++ "\n"
+        "Count: " ++ show cnt ++ "   "
           ++ "Result: "
           ++ show v
-          ++ "\n"
+
+-- >>> goMega ok
+
+-- >>> goMega err
 
 {-
 In the end, making your own mega-monad is a bit disappointing, since we've
 already defined the state- and exception-handling functionality separately.
 
-A better answer is to build them piece by piece.  We'll do this by defining
-some type level functions that will *add* state manipulation or exception
-handling to *any* pre-existing monad.
+A better answer is to build this monad (and others like it) piece by piece.
+We'll do this by defining some type level functions that will *add* state
+manipulation or exception handling to *any* pre-existing monad.
 
 Step 3: Adding Features to Existing Monads
 ------------------------------------------
 
 To add new features to existing monads, we use *monad transformers* --
-type operators `t` that map each monad `m` to a monad `t m`.
+type operators `t` that map a monad `m` to a new monad `t m`.
 
 **A Transformer For Exceptions**
 
 Consider the following datatype declaration:
 -}
 
+type ExceptT :: Type -> (Type -> Type) -> Type -> Type
 newtype ExceptT e m a = MkExc {runExceptT :: m (Either e a)}
 
 {-
-Look closely at the kind of `ExceptT`
-
-    *Main> :k ExceptT
-    ExceptT :: Type -> (Type -> Type) -> Type -> Type
+Look closely at the kind of `ExceptT` above.
 
 This type constructor takes a type `e` (the type of the error value, such as
 `String`), then an underlying monad `m` and then an argument `a`. It is a lot
@@ -435,9 +431,9 @@ If you look at the definition of `ExceptT` you'll see that this monad *wraps*
 the `Either e a` type.
 
 If `m` is a monad, then we can make `ExceptT` a monad. Furthermore, the
-definition looks a lot like the definition of the `Either` monad. We just need
-to (a) work wth the newtype (`MkExc` and `runExceptT`) and (b) use return and
-`>>=` from the monad `m` to string computations together.
+instance below looks a lot like the Monad instance for the `Either` type above. We just need
+to (a) work with the newtype (using `MkExc` and `runExceptT`) and (b) use return and
+`>>=` from the monad `m` to glue computations together.
 -}
 
 instance Monad m => Monad (ExceptT e m) where
@@ -461,7 +457,7 @@ instance Monad m => Functor (ExceptT e m) where
   fmap = liftM
 
 {-
-And next we ensure that the transformer is an exception monad by
+Next, we ensure that the transformer is also an exception monad by
 equipping it with `throwError`.
 
 Compare this definition to that of `MonadError e (Either e)` above.
@@ -475,20 +471,21 @@ instance Monad m => MonadError e (ExceptT e m) where
 **A Transformer For State**
 
 Next, we will build a transformer for the state monad, following more or less
-the same recipe as we did for exceptions. Here is the type for the
-transformer:
+the same recipe as we did for exceptions. Here is the definition for the
+transformer (preceded by its kind):
 -}
 
+type StateT :: Type -> (Type -> Type) -> Type -> Type
 newtype StateT s m a = MkStateT {runStateT :: s -> m (a, s)}
 
 {-
-Thus, in effect, the enhanced monad is a variant of the ordinary state
-monad where a starting store is mapped to a computation in the monad `m`
-that returns both a result of type `a` and a new store.
+The enhanced monad is a variant of the ordinary state monad where a starting
+store is mapped to a computation in the monad `m` that returns both a result
+of type `a` and a new store.
 
-(Note that the monad transformer is *not* this:
+(Aside: note that the monad transformer is *not* defined like this:
 
-    newtype StateT s m a = MkStateT (m (s -> (a, s)))
+    newtype StateT s m a = MkStateT { runStateT :: m (s -> (a, s)) }
 
 That is, it is not an `m` computation yielding a store transformation.
 Why is this not what we want?)
@@ -637,44 +634,42 @@ evalStEx = evalMega
 We can run these interpreters as follows:
 -}
 
-goExSt :: Expr -> IO ()
-goExSt e = putStr $ pr (evalExSt e)
+goExSt :: Expr -> String
+goExSt e = pr (evalExSt e)
   where
     pr :: StateT Int (Either String) Int -> String
     pr f = case runStateT f 0 of
-      Left s -> "Raise: " ++ s ++ "\n"
+      Left s -> "Raise: " ++ s
       Right (v, cnt) ->
-        "Count: " ++ show cnt ++ "\n"
+        "Count: " ++ show cnt ++ "  "
           ++ "Result: "
           ++ show v
-          ++ "\n"
 
-goStEx :: Expr -> IO ()
-goStEx e = putStr $ pr (evalStEx e)
+goStEx :: Expr -> String
+goStEx e = pr (evalStEx e)
   where
     pr :: ExceptT String Prof Int -> String
-    pr f = "Count: " ++ show cnt ++ "\n" ++ show r ++ "\n"
+    pr f = "Count: " ++ show cnt ++ "\n" ++ pe r ++ "\n"
       where
         (r, cnt) = S.runState (runExceptT f) 0
+    pe r = case r of
+      Left s -> "Raise: " ++ s
+      Right v -> "Result " ++ show v
 
 {-
 When everything works, we get the same answer. But look what happens if
 we try to divide by zero!
+-}
 
-~~~~~{.haskell}
-    *Main> goExSt ok
-    Count: 2
-    Result: 42
-    *Main> goExSt err
-    Raise: Error dividing 1 by 0
-    *Main> goStEx ok
-    Count: 2
-    Right 42
-    *Main> goStEx err
-    Count: 1
-    Left "Error dividing 1 by 0"
-~~~~~
+-- >>> goExSt ok
 
+-- >>> goExSt err
+
+-- >>> goStEx ok
+
+-- >>> goStEx err
+
+{-
 Step 6: Getting the original monads back
 -----------------------------------------
 
@@ -702,3 +697,12 @@ instance Functor Id where
 type State2 s = StateT s Id -- isomorphic to State s
 
 type Either2 s = ExceptT s Id -- isomorphic to Either s
+
+{-
+Step 7: Using the library in your code
+---------------------------------------
+
+The `mtl` library wraps contains the definitions of `StateT`, `MonadState`, `ExceptT`, `MonadError`, and the instances described above.
+
+The file [MtlExample](MtlExample.hs) demonstrates how to use this library using the examples in this file.
+-}

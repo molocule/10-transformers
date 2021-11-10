@@ -1,22 +1,19 @@
 {-
 ---
-fulltitle: "In class exercise: L"
+fulltitle: "In class exercise: LSyntax"
 ---
 
 This file defines the abstract syntax for a simple imperative programming (L)
  language extended with exceptions.
 
-It is meant to go with the in class exercise on monad transformers.
+It is meant to go with the in-class exercise on monad transformers (TransExercise)[TransExercise.hs].
 -}
 
 module LSyntax where
 
-import Data.Monoid
-import Prelude hiding ((<>))
-
 {-
-Abstract Syntax
-===============
+Syntax
+======
 
 -}
 
@@ -33,7 +30,6 @@ instance Monoid Block where
   mempty = Block []
 
 {-
-and statements themselves can be one of several flavors
 
 -}
 
@@ -59,10 +55,6 @@ data Bop
   deriving (Eq, Show, Enum)
 
 data Value
-  = IntVal Int
-  | NilVal
+  = IntVal Int -- literal ints
+  | NilVal -- `nil`
   deriving (Eq, Show)
-
-{-
-
--}

@@ -16,7 +16,9 @@
 - ignore: {name: "Use Control.Monad.void"}
 - ignore: {name: "Use head"}
 - ignore: {name: "Use minimum"}
+- ignore: {name: "Unused LANGUAGE pragma"}
 - ignore: {name: "Use record patterns"}
 - ignore: {name: "Replace case with fromMaybe"}
 - ignore: {name: "Eta reduce"}
 - ignore: {name: "Use lambda-case"}
+

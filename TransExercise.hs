@@ -103,7 +103,7 @@ Now we can run expressions that may throw errors!
 -}
 
 executeE :: Expression -> Store -> (Either Value Value, Store)
-executeE e st = runState (runExceptT comp) st
+executeE e = runState (runExceptT comp)
   where
     comp :: M Value
     comp = undefined -- replace this with `evalE e`

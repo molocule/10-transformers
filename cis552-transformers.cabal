@@ -13,6 +13,7 @@ library
                      , LSyntax
                      , TransExercise
                      , State
+                     , MtlExample
   build-depends:       HUnit >= 1.6
                      , QuickCheck >= 2.14
                      , base >= 4.14
