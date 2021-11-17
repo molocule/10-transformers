@@ -61,21 +61,27 @@ Expression Evaluator
 type Store = Map Var Value
 
 -- remove this type annotation to reveal a more general type for this function
-evalE :: Expression -> State Store Value
+-- evalE :: Expression -> State Store Value
+
+evalE :: (MonadState (Map Var Value) m, MonadError Value m) => Expression -> m Value
 evalE (Var x) = do
   m <- get
   case Map.lookup x m of
     Just v -> return v
-    Nothing -> return NilVal
+    Nothing -> throwError (IntVal 0)
 evalE (Val v) = return v
-evalE (Op2 e1 o e2) = evalOp2 o <$> evalE e1 <*> evalE e2
+evalE (Op2 e1 o e2) = do
+  eval1 <- evalE e1
+  eval2 <- evalE e2
+  evalOp2 o eval1 eval2
 
-evalOp2 Plus (IntVal i1) (IntVal i2) = IntVal (i1 + i2)
-evalOp2 Minus (IntVal i1) (IntVal i2) = IntVal (i1 - i2)
-evalOp2 Times (IntVal i1) (IntVal i2) = IntVal (i1 * i2)
-evalOp2 Divide (IntVal _) (IntVal 0) = NilVal -- return nil for divide by 0
-evalOp2 Divide (IntVal i1) (IntVal i2) = IntVal (i1 `div` i2)
-evalOp2 _ _ _ = NilVal
+evalOp2 :: MonadError Value m => Bop -> Value -> Value -> m Value
+evalOp2 Plus (IntVal i1) (IntVal i2) = return (IntVal (i1 + i2))
+evalOp2 Minus (IntVal i1) (IntVal i2) = return (IntVal (i1 - i2))
+evalOp2 Times (IntVal i1) (IntVal i2) = return (IntVal (i1 * i2))
+evalOp2 Divide (IntVal n) (IntVal 0) = throwError (IntVal 1) -- return nil for divide by 0
+evalOp2 Divide (IntVal i1) (IntVal i2) = return (IntVal (i1 `div` i2))
+evalOp2 _ _ _ = throwError (IntVal 2)
 
 {-
 2. Next, modify `evalOp2` and `evalE` above so that they use `throwError` (from the `MonadError` class) for runtime errors
@@ -106,7 +112,7 @@ executeE :: Expression -> Store -> (Either Value Value, Store)
 executeE e = runState (runExceptT comp)
   where
     comp :: M Value
-    comp = undefined -- replace this with `evalE e`
+    comp = evalE e -- replace this with `evalE e`
 
 {-
 We can display the errors nicely for experimentation in ghci with
@@ -122,9 +128,11 @@ For example, try these out:
 
 -- "1 / 0"
 -- >>> display (fst (executeE (Op2  (Val (IntVal 1)) Divide (Val (IntVal 0))) Map.empty))
+-- "Uncaught exception: Divide by zero"
 
 -- "1 / 1"
 -- >>> display (fst (executeE (Op2  (Val (IntVal 1)) Divide (Val (IntVal 1))) Map.empty))
+-- "Result: IntVal 1"
 
 {-
 We can also write tests that expect a particular execution to
@@ -154,6 +162,9 @@ test_divByZero = "divide by zero" ~: divByZero `raisesE` IntVal 1
 badPlus :: Expression
 badPlus = Op2 (Val (IntVal 1)) Plus (Val NilVal)
 
+goodPlus :: Expression
+goodPlus = Op2 (Val (IntVal 1)) Plus (Val (IntVal 2))
+
 test_badPlus :: Test
 test_badPlus = "bad arg to plus" ~: badPlus `raisesE` IntVal 2
 
@@ -163,6 +174,7 @@ test_expErrors =
     ~: TestList [test_undefined, test_divByZero, test_badPlus]
 
 -- >>> runTestTT test_expErrors
+-- Counts {cases = 3, tried = 3, errors = 0, failures = 0}
 
 {-
 Statement Evaluator
@@ -204,7 +216,13 @@ eval (Block ss) = mapM_ evalS ss
 -}
 
 execute :: Block -> Store -> (Either Value (), Store)
-execute b st = undefined
+execute b st = runState (runExceptT (eval b)) st
+
+-- executeE :: Expression -> Store -> (Either Value Value, Store)
+-- executeE e = runState (runExceptT comp)
+--   where
+--     comp :: M Value
+--     comp = evalE e
 
 {-
 Try out your `execute` with this operation:
@@ -219,8 +237,8 @@ run block =
 For example:
 -}
 
--- >>> run $ Block [While badPlus (Block [])]
-
+-- >>> run $ Block [While test_badPlus (Block [])]
+-- Couldn't match expected type ‘Expression’ with actual type ‘Test’
 {-
 Test your functions with this helper
 -}
@@ -241,8 +259,10 @@ test_badIf :: Test
 test_badIf = Block [If divByZero (Block []) (Block [])] `raises` IntVal 1
 
 -- >>> runTestTT test_badWhile
+-- Counts {cases = 1, tried = 1, errors = 0, failures = 0}
 
--- >>> runTestTT test_badIf
+-- >>> 
+-- runTestTT test_badIf
 
 {-
 5. Add user-level exceptions
