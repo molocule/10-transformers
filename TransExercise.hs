@@ -204,8 +204,21 @@ evalS w@(While e ss) = do
   when (evalCondition v) $ do
     eval ss
     evalS w
-evalS (Try _ _ _) = error "evalS: unimplemented"
-evalS (Throw _) = error "evalS: unimplemented"
+evalS (Try s x h) = do
+  catchError (eval s) (\v -> evalS (Assign x (Val v)) >> eval h)
+evalS (Throw e) = do
+  v <- evalE e
+  throwError v
+
+-- evalE e >>= throwError
+
+-- - `Throw e` should evaluate the expression `e` and trigger an exception
+--   carrying the value of `e`
+
+-- - `Try s x h` should execute the statement `s` and if, in the course
+--   of execution, an exception is thrown, then the exception value should
+--   be assigned to the variable `x` after which the *handler* statement
+--   `h` should be executed.
 
 -- type annotation intentionally not given
 eval (Block ss) = mapM_ evalS ss
@@ -261,8 +274,8 @@ test_badIf = Block [If divByZero (Block []) (Block [])] `raises` IntVal 1
 -- >>> runTestTT test_badWhile
 -- Counts {cases = 1, tried = 1, errors = 0, failures = 0}
 
--- >>> 
--- runTestTT test_badIf
+-- >>> runTestTT test_badIf
+-- Counts {cases = 1, tried = 1, errors = 0, failures = 0}
 
 {-
 5. Add user-level exceptions
